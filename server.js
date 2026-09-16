@@ -10,6 +10,7 @@ const scrypt = promisify(crypto.scrypt);
 const root = __dirname;
 const port = Number(process.env.PORT || 3000);
 const productionRuntime=process.env.NODE_ENV==="production"||["RAILWAY_PROJECT_ID","RAILWAY_SERVICE_ID","RAILWAY_ENVIRONMENT_ID","RAILWAY_ENVIRONMENT"].some(key=>Boolean(process.env[key]));
+const loginCodeRequired=productionRuntime||String(process.env.AUTH_LOGIN_CODE_REQUIRED||"true").toLowerCase()!=="false";
 const sessionDays = 7;
 const mime = {".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".avif":"image/avif",".webp":"image/webp",".webm":"video/webm",".mp4":"video/mp4",".mov":"video/quicktime",".svg":"image/svg+xml",".ico":"image/x-icon",".txt":"text/plain; charset=utf-8"};
 const now = () => new Date().toISOString();
@@ -175,12 +176,13 @@ function selectedEmailProvider(){
   return "development";
 }
 async function sendTransactionalEmail(message){
+  message={...message,subject:String(message.subject||"").replaceAll("Vanguard Prime","Ayat Kazanchis Real Estate"),html:String(message.html||"").replaceAll("Vanguard Prime","Ayat Kazanchis Real Estate")};
   const hasResend=configuredSecret(process.env.RESEND_API_KEY),activeProvider=selectedEmailProvider(),deliveryId=publicId("EML"),timestamp=now();
   db.prepare("INSERT INTO email_deliveries (public_id,recipient,subject,kind,provider,status,created_at) VALUES (?,?,?,?,?,'pending',?)").run(deliveryId,message.to,message.subject,message.kind||"transactional",activeProvider,timestamp);
   try{
     let delivered=false;
     if(activeProvider==="zoho")delivered=await sendZohoEmail(message);
-    else if(activeProvider==="resend"){if(!hasResend)throw new Error("Resend requires RESEND_API_KEY.");const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":`Bearer ${process.env.RESEND_API_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({from:process.env.AUTH_FROM_EMAIL||process.env.RESET_FROM_EMAIL||"Vanguard Prime <onboarding@resend.dev>",to:[message.to],subject:message.subject,html:message.html}),signal:AbortSignal.timeout(10000)});if(!response.ok)throw new Error("Email could not be sent.");delivered=true}
+    else if(activeProvider==="resend"){if(!hasResend)throw new Error("Resend requires RESEND_API_KEY.");const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":`Bearer ${process.env.RESEND_API_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({from:process.env.AUTH_FROM_EMAIL||process.env.RESET_FROM_EMAIL||"Ayat Kazanchis Real Estate <onboarding@resend.dev>",to:[message.to],subject:message.subject,html:message.html}),signal:AbortSignal.timeout(10000)});if(!response.ok)throw new Error("Email could not be sent.");delivered=true}
     else throw new Error("Email delivery is not configured.");
     db.prepare("UPDATE email_deliveries SET status=?,attempts=1,sent_at=? WHERE public_id=?").run(delivered?"sent":"skipped",delivered?now():null,deliveryId);
     return delivered;
@@ -203,9 +205,9 @@ function emailDeliveryStatus(){
 }
 function emailEscape(value){return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]))}
 function moneyEmail(amountCents,currency="USD"){try{return new Intl.NumberFormat("en-US",{style:"currency",currency}).format(Number(amountCents||0)/100)}catch{return `${currency} ${(Number(amountCents||0)/100).toFixed(2)}`}}
-function emailTemplate({eyebrow="Vanguard Prime",title,intro="",content="",actionUrl="",actionLabel="",note=""}){
+function emailTemplate({eyebrow="Ayat Kazanchis",title,intro="",content="",actionUrl="",actionLabel="",note=""}){
   const button=actionUrl&&actionLabel?`<p style="margin:28px 0"><a href="${emailEscape(actionUrl)}" style="display:inline-block;background:#0b7a3e;color:#fff;text-decoration:none;padding:13px 22px;border-radius:8px;font-weight:700">${emailEscape(actionLabel)}</a></p>`:"";
-  return `<!doctype html><html><body style="margin:0;background:#f3f6f4;font-family:Arial,sans-serif;color:#17211b"><div style="display:none;max-height:0;overflow:hidden">${emailEscape(intro||title)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6f4;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fff;border:1px solid #dce7df;border-radius:14px;overflow:hidden"><tr><td style="background:#075c32;padding:24px 30px;color:#fff"><div style="font-size:18px;font-weight:800;letter-spacing:.08em">VANGUARD PRIME</div></td></tr><tr><td style="padding:32px 30px"><div style="color:#0b7a3e;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">${emailEscape(eyebrow)}</div><h1 style="font-size:25px;line-height:1.25;margin:9px 0 14px;color:#102117">${emailEscape(title)}</h1>${intro?`<p style="font-size:16px;line-height:1.65;color:#435248">${emailEscape(intro)}</p>`:""}${content}${button}${note?`<p style="margin-top:26px;padding-top:20px;border-top:1px solid #e3ebe6;color:#6a766e;font-size:13px;line-height:1.55">${emailEscape(note)}</p>`:""}</td></tr><tr><td style="background:#f7faf8;padding:18px 30px;color:#748078;font-size:12px">This is an automated security and account message from Vanguard Prime.</td></tr></table></td></tr></table></body></html>`;
+  return `<!doctype html><html><body style="margin:0;background:#f3f6f4;font-family:Arial,sans-serif;color:#17211b"><div style="display:none;max-height:0;overflow:hidden">${emailEscape(intro||title)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6f4;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fff;border:1px solid #dce7df;border-radius:14px;overflow:hidden"><tr><td style="background:#0d3b2e;padding:24px 30px;color:#fff"><div style="font-size:18px;font-weight:800;letter-spacing:.08em">AYAT KAZANCHIS</div><div style="font-size:10px;letter-spacing:.12em;margin-top:5px">REAL ESTATE</div></td></tr><tr><td style="padding:32px 30px"><div style="color:#9b762f;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">${emailEscape(eyebrow)}</div><h1 style="font-size:25px;line-height:1.25;margin:9px 0 14px;color:#102117">${emailEscape(title)}</h1>${intro?`<p style="font-size:16px;line-height:1.65;color:#435248">${emailEscape(intro)}</p>`:""}${content}${button}${note?`<p style="margin-top:26px;padding-top:20px;border-top:1px solid #e3ebe6;color:#6a766e;font-size:13px;line-height:1.55">${emailEscape(note)}</p>`:""}</td></tr><tr><td style="background:#f7faf8;padding:18px 30px;color:#748078;font-size:12px">This is an automated security and account message from Ayat Kazanchis Real Estate.</td></tr></table></td></tr></table></body></html>`;
 }
 function publicUrl(req,pathname){const configured=String(process.env.APP_URL||"").trim().replace(/\/$/,"");if(/^https?:\/\//i.test(configured))return `${configured}${pathname.startsWith("/")?pathname:`/${pathname}`}`;const protocol=String(req?.headers?.["x-forwarded-proto"]||"http").split(",")[0].trim(),host=req?.headers?.host;return host?`${protocol}://${host}${pathname.startsWith("/")?pathname:`/${pathname}`}`:pathname}
 async function safeTransactionalEmail(message){try{return await sendTransactionalEmail(message)}catch(error){console.error(`Email delivery failed (${message.kind||"transactional"}): ${error.message}`);return false}}
@@ -216,10 +218,10 @@ async function sendPasswordReset(email,link){
 async function sendVerificationCode(email,code,purpose){
   const action=purpose==="registration"?"confirm your Vanguard Prime account":"complete your Vanguard Prime sign in";
   const title=purpose==="registration"?"Confirm your account":"Confirm your sign in",content=`<p style="font-size:16px;line-height:1.65;color:#435248">Use this one-time code to ${action}:</p><div style="margin:24px 0;padding:18px;text-align:center;background:#eef8f2;border:1px solid #cce8d7;border-radius:10px;font-size:34px;font-weight:800;letter-spacing:9px;color:#075c32">${code}</div>`;
-  const sent=await sendTransactionalEmail({to:email,kind:`${purpose}_code`,subject:purpose==="registration"?"Confirm your Vanguard Prime account":"Your Vanguard Prime sign-in code",html:emailTemplate({eyebrow:"Verification",title,content,note:`This code expires in ${verificationCodeMinutes} minutes and can only be used once. Never share it with anyone.`})});
+  const sent=await sendTransactionalEmail({to:email,kind:`${purpose}_code`,subject:purpose==="registration"?"Confirm your Ayat Kazanchis account":"Your Ayat Kazanchis sign-in code",html:emailTemplate({eyebrow:"Verification",title,content,note:`This code expires in ${verificationCodeMinutes} minutes and can only be used once. Never share it with anyone.`})});
   if(!sent)console.log(`[${purpose} verification] ${email}: ${code}`);return sent;
 }
-async function sendWelcomeEmail(user,req){return safeTransactionalEmail({to:user.email,kind:"welcome",subject:"Welcome to Vanguard Prime",html:emailTemplate({eyebrow:"Account ready",title:`Welcome, ${user.first_name||user.name||"Investor"}`,intro:"Your email address is confirmed and your Vanguard Prime account is ready.",actionUrl:publicUrl(req,"/dashboard.html"),actionLabel:"Open your dashboard",note:"If you did not create this account, contact support immediately."})})}
+async function sendWelcomeEmail(user,req){return safeTransactionalEmail({to:user.email,kind:"welcome",subject:"Welcome to Ayat Kazanchis",html:emailTemplate({eyebrow:"Account ready",title:`Welcome, ${user.first_name||user.name||"Investor"}`,intro:"Your email address is confirmed and your Ayat Kazanchis account is ready.",actionUrl:publicUrl(req,"/dashboard.html"),actionLabel:"Open your dashboard",note:"If you did not create this account, contact support immediately."})})}
 async function sendAccountNotificationEmail(user,{title,message,category="general"}){return safeTransactionalEmail({to:user.email,kind:`notification_${category}`,subject:title,html:emailTemplate({eyebrow:`${category} notification`,title,intro:message,note:"You can also view this notification in your Vanguard Prime dashboard."})})}
 async function sendNotificationBatch(users,notification){const results=[];for(let index=0;index<users.length;index+=5){const batch=users.slice(index,index+5);results.push(...await Promise.all(batch.map(user=>sendAccountNotificationEmail(user,notification))))}return {sent:results.filter(Boolean).length,failed:results.filter(result=>!result).length}}
 async function sendWalletEventEmail(user,{type,status,amountCents,feeCents=0,currency="USD",method="",transactionId=""}){
@@ -269,15 +271,16 @@ function kycResponse(row){
 }
 function maskedEmail(email){const [name,domain]=String(email).split("@");return `${name.slice(0,2)}${"*".repeat(Math.max(1,name.length-2))}@${domain}`}
 async function issueVerificationCode(user,purpose,req,{force=false}={}){
+  const localBypass=!productionRuntime&&String(process.env.DEV_AUTH_BYPASS||"").toLowerCase()==="true";
   const emailStatus=emailDeliveryStatus();
-  if(!emailStatus.configured||emailStatus.provider==="development")throw Object.assign(new Error("Email verification is unavailable until Zoho Mail is configured."),{status:503});
+  if(!localBypass&&(!emailStatus.configured||emailStatus.provider==="development"))throw Object.assign(new Error("Email verification is unavailable until Zoho Mail is configured."),{status:503});
   const latest=db.prepare("SELECT created_at FROM email_verification_codes WHERE user_id=? AND purpose=? ORDER BY id DESC LIMIT 1").get(user.id,purpose);
   if(!force&&latest&&Date.now()-new Date(latest.created_at).getTime()<30000)throw Object.assign(new Error("Please wait 30 seconds before requesting another code."),{status:429});
   const code=String(crypto.randomInt(0,1000000)).padStart(6,"0"),timestamp=now(),expires=new Date(Date.now()+verificationCodeMinutes*60000).toISOString();
   db.prepare("UPDATE email_verification_codes SET used_at=? WHERE user_id=? AND purpose=? AND used_at IS NULL").run(timestamp,user.id,purpose);
   db.prepare("INSERT INTO email_verification_codes (user_id,purpose,code_hash,expires_at,requested_ip,created_at) VALUES (?,?,?,?,?,?)").run(user.id,purpose,verificationCodeHash(code),expires,requestIp(req),timestamp);
-  try{await sendVerificationCode(user.email,code,purpose)}catch(error){console.error(error.message);throw Object.assign(new Error("We could not send the verification email. Please try again."),{status:502})}
-  return {expiresInSeconds:verificationCodeMinutes*60};
+  if(!localBypass){try{await sendVerificationCode(user.email,code,purpose)}catch(error){console.error(error.message);throw Object.assign(new Error("We could not send the verification email. Please try again."),{status:502})}}
+  return {expiresInSeconds:verificationCodeMinutes*60,...(localBypass?{developmentCode:code,developmentBypass:true}:{})};
 }
 function verifyEmailCode(user,purpose,code){
   const record=db.prepare("SELECT * FROM email_verification_codes WHERE user_id=? AND purpose=? AND used_at IS NULL ORDER BY id DESC LIMIT 1").get(user.id,purpose);
@@ -292,7 +295,16 @@ function audit(actorId, action, entityType, entityId, details, req) {
 }
 
 async function api(req, res, url) {
-  if(req.method==="GET"&&url.pathname==="/api/health"){const email=emailDeliveryStatus();return json(res,200,{status:"ok",service:"vanguardprime",time:now(),email:{provider:email.provider,configured:email.configured,missing:email.missing}})}
+  if(req.method==="GET"&&url.pathname==="/api/health"){const email=emailDeliveryStatus();return json(res,200,{status:"ok",service:"ayat-kazanchis",time:now(),email:{provider:email.provider,configured:email.configured,missing:email.missing}})}
+  if(req.method==="GET"&&url.pathname==="/api/public/activity"){
+    const rows=db.prepare(`SELECT event_type,location,event_time FROM (
+      SELECT 'account' AS event_type,COALESCE(NULLIF(country,''),'Ethiopia') AS location,created_at AS event_time FROM users WHERE status='active'
+      UNION ALL SELECT 'investment',COALESCE(NULLIF(u.country,''),'Ethiopia'),o.created_at FROM investment_orders o JOIN users u ON u.id=o.user_id
+      UNION ALL SELECT 'milestone',COALESCE(NULLIF(u.country,''),'Ethiopia'),t.updated_at FROM wallet_transactions t JOIN users u ON u.id=t.user_id WHERE t.type='deposit' AND t.status='confirmed'
+    ) ORDER BY event_time DESC LIMIT 8`).all();
+    const label={account:"A new member created an account",investment:"An investor opened a property opportunity",milestone:"A customer completed a payment milestone"};
+    return json(res,200,{activities:rows.map(row=>({message:`${label[row.event_type]} in ${row.location}.`,time:row.event_time}))});
+  }
   if(req.method==="GET"&&url.pathname==="/api/btc-price"){
     if(btcPriceCache.value&&Date.now()-btcPriceCache.cachedAt<30000)return json(res,200,btcPriceCache.value);
     try{
@@ -365,8 +377,8 @@ async function api(req, res, url) {
     if(lastName.length<1||lastName.length>50)errors.lastName="Enter your last name.";
     if(!/^\+?[0-9 ()-]{7,25}$/.test(phone))errors.phone="Enter a valid phone number.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Enter a valid email address.";
-    if(!/^\d{6}$/.test(loginCode))errors.loginCode="Create a 6-digit login code.";
-    if(loginCode!==loginCodeConfirmation)errors.loginCodeConfirmation="Login codes do not match.";
+    if(loginCodeRequired&&!/^\d{6}$/.test(loginCode))errors.loginCode="Create a 6-digit login code.";
+    if(loginCodeRequired&&loginCode!==loginCodeConfirmation)errors.loginCodeConfirmation="Login codes do not match.";
     if (!country) errors.country = "Select your country.";
     if (!/^[A-Z]{3}$/.test(currency)) errors.currency = "Select a valid currency.";
     const referrer=requestedReferral&&settingEnabled("referrals_enabled")?db.prepare("SELECT id,public_id,email,phone FROM users WHERE referral_code=? AND status='active'").get(requestedReferral):null;
@@ -374,11 +386,11 @@ async function api(req, res, url) {
     if(referrer&&(referrer.email===email||(referrer.phone&&referrer.phone.replace(/\D/g,"")===phone.replace(/\D/g,""))))errors.referralCode="You cannot use your own referral code.";
     if (Object.keys(errors).length) return json(res, 422, { error:"Please correct the highlighted fields.", fields:errors });
     if (db.prepare("SELECT 1 FROM users WHERE email=?").get(email)) return json(res, 409, { error:"An account already exists for this email.", fields:{email:"Email is already registered."} });
-    const timestamp=now(), passwordHashValue=await passwordHash(crypto.randomBytes(32).toString("hex")),loginCodeHash=await passwordHash(loginCode),id=publicId("USR"),code=referralCode(),ip=requestIp(req);
+    const timestamp=now(), passwordHashValue=await passwordHash(crypto.randomBytes(32).toString("hex")),loginCodeHash=await passwordHash(loginCodeRequired?loginCode:crypto.randomBytes(32).toString("hex")),id=publicId("USR"),code=referralCode(),ip=requestIp(req);
     db.exec("BEGIN IMMEDIATE");
     let result;
     try {
-      result=db.prepare("INSERT INTO users (public_id,name,email,password_hash,login_code_hash,country,currency,first_name,last_name,phone,referral_code,registration_ip,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id,name,email,passwordHashValue,loginCodeHash,country,currency,firstName,lastName,phone,code,ip,null,timestamp,timestamp);
+      result=db.prepare("INSERT INTO users (public_id,name,email,password_hash,login_code_hash,country,currency,first_name,last_name,phone,referral_code,registration_ip,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?)").run(id,name,email,passwordHashValue,loginCodeHash,country,currency,firstName,lastName,phone,code,ip,timestamp,timestamp);
       db.prepare("INSERT INTO wallets (user_id,currency,available_cents,created_at,updated_at) VALUES (?,?,0,?,?)").run(result.lastInsertRowid,currency,timestamp,timestamp);
       db.prepare("INSERT INTO affiliates (user_id,affiliate_id,status,created_at,updated_at) VALUES (?,?,'inactive',?,?)").run(result.lastInsertRowid,publicId("AFF"),timestamp,timestamp);
       if(referrer)db.prepare("INSERT INTO referrals (public_id,referrer_user_id,referred_user_id,referral_code,created_at) VALUES (?,?,?,?,?)").run(publicId("RFL"),referrer.id,result.lastInsertRowid,requestedReferral,timestamp);
@@ -388,8 +400,9 @@ async function api(req, res, url) {
     } catch(error) { db.exec("ROLLBACK"); throw error; }
     const user=db.prepare("SELECT * FROM users WHERE id=?").get(result.lastInsertRowid);
     let verification;
-    try{verification=await issueVerificationCode(user,"registration",req,{force:true})}catch(error){db.prepare("DELETE FROM users WHERE id=?").run(user.id);throw error}
-    return json(res,201,{message:"Account created. Confirm the code sent to your email.",verificationRequired:true,purpose:"registration",email:user.email,maskedEmail:maskedEmail(user.email),...verification},{"Set-Cookie":clearCookie()});
+    try{verification=await issueVerificationCode(user,"registration",req,{force:true})}
+    catch(error){db.prepare("DELETE FROM users WHERE id=? AND email_verified_at IS NULL").run(user.id);throw error}
+    return json(res,201,{message:"Account created. Check your email for the confirmation code.",verificationRequired:true,purpose:"registration",email:user.email,maskedEmail:maskedEmail(user.email),...verification});
   }
 
   if (req.method === "POST" && url.pathname === "/api/login") {
@@ -397,13 +410,12 @@ async function api(req, res, url) {
     if(Date.now()>attempts.reset){attempts.count=0;attempts.reset=Date.now()+15*60000}
     if(attempts.count>=10)return json(res,429,{error:"Too many login attempts. Try again later."});
     const input=await body(req),email=String(input.email||"").trim().toLowerCase(),loginCode=String(input.loginCode||""),user=db.prepare("SELECT * FROM users WHERE email=?").get(email);
-    const validLogin=user&&(user.login_code_hash?(/^\d{6}$/.test(loginCode)&&await passwordMatches(loginCode,user.login_code_hash)):await passwordMatches(loginCode,user.password_hash));
+    const validLogin=user&&(!loginCodeRequired||(user.login_code_hash?(/^\d{6}$/.test(loginCode)&&await passwordMatches(loginCode,user.login_code_hash)):await passwordMatches(loginCode,user.password_hash)));
     if(!validLogin){attempts.count++;loginAttempts.set(ip,attempts);return json(res,401,{error:"Incorrect email address or login code."})}
     if(user.status!=="active")return json(res,403,{error:"This account is not active."});
     loginAttempts.delete(ip);
     const purpose=user.email_verified_at?"login":"registration",verification=await issueVerificationCode(user,purpose,req,{force:true});
-    audit(user.public_id,purpose==="login"?"requested_sign_in_code":"requested_registration_code","email_verification",null,{},req);
-    return json(res,200,{message:purpose==="login"?"Confirm the code sent to your email.":"Confirm your email to finish setting up your account.",verificationRequired:true,purpose,email:user.email,maskedEmail:maskedEmail(user.email),...verification},{"Set-Cookie":clearCookie()});
+    return json(res,200,{message:"Check your email for the one-time verification code.",verificationRequired:true,purpose,email:user.email,maskedEmail:maskedEmail(user.email),...verification});
   }
   if(req.method==="POST"&&url.pathname==="/api/auth/verify-registration"){
     const input=await body(req),email=String(input.email||"").trim().toLowerCase(),code=String(input.code||"").trim(),user=db.prepare("SELECT * FROM users WHERE email=?").get(email);
@@ -539,6 +551,7 @@ async function api(req, res, url) {
       } else if(["rejected","cancelled"].includes(status)&&tx.status==="pending") {
         db.prepare("UPDATE wallets SET pending_cents=max(0,pending_cents-?),version=version+1,updated_at=? WHERE id=?").run(tx.amount_cents,timestamp,tx.wallet_id);
       }
+      db.prepare("UPDATE bank_transfer_requests SET status=?,admin_note=COALESCE(admin_note,?),updated_at=? WHERE wallet_transaction_id=?").run(status==="confirmed"?"confirmed":"rejected",status==="cancelled"?"Payment review was cancelled.":null,timestamp,tx.id);
       db.prepare("INSERT INTO audit_logs (actor_type,actor_id,action,entity_type,entity_id,details_json,ip_address,created_at) VALUES ('admin',?,'updated_payment_status','wallet_transaction',?,?,?,?)").run(admin.email,paymentId,JSON.stringify({status,previousStatus:tx.status}),requestIp(req),timestamp);
       db.exec("COMMIT");
     }catch(error){db.exec("ROLLBACK");throw error}
@@ -559,6 +572,7 @@ async function api(req, res, url) {
       db.prepare("UPDATE wallet_transactions SET status=?,updated_at=? WHERE id=?").run(status,timestamp,tx.id);
       if(status==="confirmed"&&tx.status!=="confirmed")db.prepare("UPDATE wallets SET available_cents=available_cents+?,pending_cents=max(0,pending_cents-?),version=version+1,updated_at=? WHERE id=?").run(tx.amount_cents,tx.amount_cents,timestamp,tx.wallet_id);
       else if(["rejected","cancelled"].includes(status)&&tx.status==="pending")db.prepare("UPDATE wallets SET pending_cents=max(0,pending_cents-?),version=version+1,updated_at=? WHERE id=?").run(tx.amount_cents,timestamp,tx.wallet_id);
+      db.prepare("UPDATE bank_transfer_requests SET status=?,admin_note=COALESCE(admin_note,?),updated_at=? WHERE wallet_transaction_id=?").run(status==="confirmed"?"confirmed":"rejected",status==="cancelled"?"Payment review was cancelled.":null,timestamp,tx.id);
       db.prepare("INSERT INTO audit_logs (actor_type,actor_id,action,entity_type,entity_id,details_json,ip_address,created_at) VALUES ('admin',?,'updated_payment_status','wallet_transaction',?,?,?,?)").run(admin.email,paymentId,JSON.stringify({status,previousStatus:tx.status}),requestIp(req),timestamp);
       db.exec("COMMIT");
     }catch(error){db.exec("ROLLBACK");throw error}
@@ -617,6 +631,16 @@ async function api(req, res, url) {
     const user=requireUser(req,res);if(!user)return;const rows=db.prepare("SELECT public_id,type,direction,amount_cents,fee_cents,currency,method,reference,status,created_at FROM wallet_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 100").all(user.id);
     return json(res,200,{transactions:rows});
   }
+  if(url.pathname==="/api/wallet/bank-requests"&&["GET","POST"].includes(req.method)){
+    const user=requireUser(req,res);if(!user)return;
+    if(req.method==="GET"){db.prepare("UPDATE bank_transfer_requests SET status='expired',updated_at=? WHERE user_id=? AND status='instructions_sent' AND expires_at<=?").run(now(),user.id,now());const requests=db.prepare("SELECT public_id AS id,amount_cents,currency,status,bank_name,beneficiary,account_number,instructions,instructions_sent_at,expires_at,payment_reference,receipt_name,submitted_at,admin_note,created_at FROM bank_transfer_requests WHERE user_id=? ORDER BY id DESC LIMIT 20").all(user.id);return json(res,200,{requests})}
+    const input=await body(req),amount=cents(input.amount);if(!Number.isSafeInteger(amount)||amount<100)return json(res,422,{error:"Bank transfer must be at least $1.00."});const id=publicId("BNK"),timestamp=now();db.prepare("INSERT INTO bank_transfer_requests (public_id,user_id,amount_cents,currency,created_at,updated_at) VALUES (?,?,?,?,?,?)").run(id,user.id,amount,user.currency||"USD",timestamp,timestamp);audit(user.public_id,"requested_bank_details","bank_transfer_request",id,{amount},req);return json(res,201,{message:"Bank details requested. An administrator will respond here.",requestId:id})
+  }
+  if(req.method==="POST"&&/^\/api\/wallet\/bank-requests\/[^/]+\/proof$/.test(url.pathname)){
+    const user=requireUser(req,res);if(!user)return;const id=decodeURIComponent(url.pathname.split("/")[4]),input=await body(req),reference=String(input.reference||"").trim(),receipt=String(input.receiptData||""),receiptName=String(input.receiptName||"").slice(0,150),record=db.prepare("SELECT * FROM bank_transfer_requests WHERE public_id=? AND user_id=?").get(id,user.id);if(!record)return json(res,404,{error:"Bank request was not found."});if(record.status!=="instructions_sent"||record.expires_at<=now())return json(res,410,{error:"These bank instructions have expired. Request new details."});if(reference.length<4||!receipt.startsWith("data:image/")||receipt.length>750000)return json(res,422,{error:"Add a payment reference and receipt image under 550 KB."});const wallet=db.prepare("SELECT * FROM wallets WHERE user_id=?").get(user.id),txId=publicId("TXN"),timestamp=now();db.exec("BEGIN IMMEDIATE");try{const tx=db.prepare("INSERT INTO wallet_transactions (public_id,wallet_id,user_id,type,direction,amount_cents,currency,method,reference,status,created_at,updated_at) VALUES (?,?,?,'deposit','credit',?,?, 'Bank Transfer',?,'pending',?,?)").run(txId,wallet.id,user.id,record.amount_cents,record.currency,reference,timestamp,timestamp);db.prepare("UPDATE wallets SET pending_cents=pending_cents+?,updated_at=? WHERE id=?").run(record.amount_cents,timestamp,wallet.id);db.prepare("UPDATE bank_transfer_requests SET status='awaiting_confirmation',payment_reference=?,receipt_data=?,receipt_name=?,submitted_at=?,wallet_transaction_id=?,updated_at=? WHERE id=?").run(reference,receipt,receiptName,timestamp,tx.lastInsertRowid,timestamp,record.id);db.exec("COMMIT")}catch(e){db.exec("ROLLBACK");throw e}return json(res,201,{message:"Receipt submitted. Your transfer is awaiting admin confirmation.",transactionId:txId})
+  }
+  if(url.pathname==="/api/admin/bank-requests"&&req.method==="GET"){if(!requireAdmin(req,res))return;db.prepare("UPDATE bank_transfer_requests SET status='expired',updated_at=? WHERE status='instructions_sent' AND expires_at<=?").run(now(),now());return json(res,200,{requests:db.prepare("SELECT b.*,u.name AS customer_name,u.email AS customer_email,t.public_id AS transaction_public_id FROM bank_transfer_requests b JOIN users u ON u.id=b.user_id LEFT JOIN wallet_transactions t ON t.id=b.wallet_transaction_id ORDER BY b.id DESC LIMIT 100").all()})}
+  if(req.method==="POST"&&/^\/api\/admin\/bank-requests\/[^/]+\/instructions$/.test(url.pathname)){const admin=requireAdmin(req,res);if(!admin)return;const id=decodeURIComponent(url.pathname.split("/")[4]),input=await body(req),bank=String(input.bankName||"").trim(),beneficiary=String(input.beneficiary||"").trim(),account=String(input.accountNumber||"").trim(),instructions=String(input.instructions||"").trim();if(!bank||!beneficiary||!account)return json(res,422,{error:"Bank name, beneficiary and account number are required."});const timestamp=now(),expires=new Date(Date.now()+15*60000).toISOString(),changed=db.prepare("UPDATE bank_transfer_requests SET status='instructions_sent',bank_name=?,beneficiary=?,account_number=?,instructions=?,instructions_sent_at=?,expires_at=?,updated_at=? WHERE public_id=? AND status IN ('requested','expired')").run(bank,beneficiary,account,instructions,timestamp,expires,timestamp,id);if(!changed.changes)return json(res,409,{error:"This request cannot receive new instructions in its current state."});return json(res,200,{message:"Bank instructions sent for 15 minutes.",expiresAt:expires})}
   if(url.pathname==="/api/admin/deposit-wallets" && ["GET","POST"].includes(req.method)){
     const admin=requireAdmin(req,res);if(!admin)return;
     if(req.method==="GET")return json(res,200,{wallets:Object.keys(depositAssets).map(depositAsset)});
@@ -776,12 +800,14 @@ function staticFile(req,res,url) {
   fs.stat(file,(error,stat)=>{
     if(error||!stat.isFile())return json(res,404,{error:"Page not found."});
     const type=mime[path.extname(file).toLowerCase()]||"application/octet-stream";
-    const baseHeaders={"Content-Type":type,"Cache-Control":type.startsWith("text/html")?"no-cache":"public, max-age=3600","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"SAMEORIGIN","Accept-Ranges":"bytes"};
+    const baseHeaders={"Content-Type":type,"Cache-Control":type.startsWith("text/html")||type==="text/css"||type.includes("javascript")?"no-cache":"public, max-age=3600","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"SAMEORIGIN","Accept-Ranges":"bytes"};
     if(type.startsWith("text/html")){
       fs.readFile(file,"utf8",(readError,source)=>{
         if(readError)return json(res,500,{error:"Page could not be loaded."});
         const bootstrap=source.includes("global-theme.css")?"":`<link rel="stylesheet" href="/global-theme.css?v=20260724"><script>(function(){document.documentElement.dataset.theme=localStorage.getItem("siteTheme")||"dark"})()</script>`;
-        let output=source.includes("</head>")?source.replace("</head>",`${bootstrap}</head>`):bootstrap+source;
+        const brandStyle='<link rel="stylesheet" href="/account-brand.css?v=20260914">';
+        let branded=source.replaceAll("Vanguard Prime","Ayat Kazanchis Real Estate").replaceAll("VANGUARD PRIME","AYAT KAZANCHIS REAL ESTATE");
+        let output=branded.includes("</head>")?branded.replace("</head>",`${bootstrap}${brandStyle}</head>`):bootstrap+brandStyle+branded;
         const runtime=source.includes("global-theme.js")?"":'<script src="/global-theme.js?v=20260724"></script>';
         output=output.includes("</body>")?output.replace("</body>",`${runtime}</body>`):output+runtime;
         const bytes=Buffer.byteLength(output);res.writeHead(200,{...baseHeaders,"Content-Length":bytes});if(req.method==="HEAD")return res.end();res.end(output);
@@ -797,4 +823,4 @@ const server=http.createServer(async(req,res)=>{
   try{if(url.pathname.startsWith("/api/"))await api(req,res,url);else if(req.method==="GET"||req.method==="HEAD")staticFile(req,res,url);else json(res,405,{error:"Method not allowed."})}
   catch(error){console.error(error);json(res,error.status||500,{error:error.status?error.message:"The server could not complete this request."})}
 });
-server.listen(port,()=>{const email=emailDeliveryStatus();console.log(`Vanguard Prime running at http://localhost:${port}`);console.log(`Runtime: ${productionRuntime?"production":"development"}; email provider: ${email.provider}; configured: ${email.configured}`);if(productionRuntime&&!email.configured)console.error(`Production email configuration is incomplete. Missing: ${email.missing.join(", ")}`)});
+server.listen(port,()=>{const email=emailDeliveryStatus();console.log(`Ayat Kazanchis running at http://localhost:${port}`);console.log(`Runtime: ${productionRuntime?"production":"development"}; email provider: ${email.provider}; configured: ${email.configured}`);if(productionRuntime&&!email.configured)console.error(`Production email configuration is incomplete. Missing: ${email.missing.join(", ")}`)});

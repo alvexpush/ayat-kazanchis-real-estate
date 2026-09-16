@@ -18,6 +18,9 @@ The Finnhub key is used only by the server and is never exposed to the browser. 
 
 For the full service/module map, see `CORE_ENGINE_SERVICES.md`.
 
+For the production VPS, Hostinger DNS, email verification, and BTC/USDT setup,
+see `VPS_DEPLOYMENT.md`.
+
 ## Useful pages
 
 - Customer registration: `/register.html`

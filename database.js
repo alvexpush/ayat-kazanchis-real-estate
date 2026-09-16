@@ -146,6 +146,20 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS bank_transfer_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    public_id TEXT NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+    currency TEXT NOT NULL DEFAULT 'USD',
+    status TEXT NOT NULL DEFAULT 'requested' CHECK(status IN ('requested','instructions_sent','awaiting_confirmation','expired','confirmed','rejected')),
+    bank_name TEXT, beneficiary TEXT, account_number TEXT, instructions TEXT,
+    instructions_sent_at TEXT, expires_at TEXT, payment_reference TEXT,
+    receipt_data TEXT, receipt_name TEXT, submitted_at TEXT, admin_note TEXT,
+    wallet_transaction_id INTEGER REFERENCES wallet_transactions(id),
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS investment_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     public_id TEXT NOT NULL UNIQUE,
@@ -447,7 +461,23 @@ if(!db.prepare("SELECT 1 FROM platform_settings WHERE key='investment_package_ca
   }catch(error){db.exec("ROLLBACK");throw error}
 }
 
+db.prepare("UPDATE investment_plans SET risk_level='Low',updated_at=? WHERE public_id LIKE 'AYAT-%' AND risk_level<>'Low'").run(new Date().toISOString());
+db.prepare("UPDATE investment_plans SET name='VIP 1-Year — $3,000–$5,000',minimum_cents=300000,maximum_cents=500000,risk_level='Low',description='Flexible entry from $3,000 to $5,000 (approximately 480,000 to 800,000 ETB principal). Final allocation and outcome require an approved agreement.',updated_at=? WHERE public_id='AYAT-VIP-3000'").run(new Date().toISOString());
 const vehicleCount = db.prepare("SELECT COUNT(*) AS count FROM vehicles").get().count;
+if(!db.prepare("SELECT 1 FROM platform_settings WHERE key='ayat_investment_catalogue_v1'").get()){
+  const timestamp=new Date().toISOString();
+  const plans=[
+    ["AYAT-REG-50","Regular 7-Day — $50","Regular",5000,5000,5000,300,7,2100,"High","Proposed outcome: $60.50 after 7 days (approximately 8,000 ETB principal). Approval required."],
+    ["AYAT-REG-300","Regular 30-Day — $300","Regular",30000,30000,30000,400,30,12000,"High","Proposed outcome: $660 after 30 days (approximately 48,000 ETB principal). Approval required."],
+    ["AYAT-REG-500","Regular 30-Day — $500","Regular",50000,50000,50000,400,30,12000,"High","Proposed outcome: $1,100 after 30 days (approximately 80,000 ETB principal). Approval required."],
+    ["AYAT-REG-700","Regular 30-Day — $700","Regular",70000,70000,70000,400,30,12000,"High","Proposed outcome: $1,540 after 30 days (approximately 112,000 ETB principal). Approval required."],
+    ["AYAT-VIP-1000","VIP 1-Year — $1,000","VIP",100000,100000,100000,500,365,182500,"High","Proposed outcome: $19,250 after 1 year (approximately 160,000 ETB principal). Approval required."],
+    ["AYAT-VIP-1500","VIP 1-Year — $1,500","VIP",150000,150000,150000,500,365,182500,"High","Proposed outcome: $28,875 after 1 year (approximately 240,000 ETB principal). Approval required."],
+    ["AYAT-VIP-2000","VIP 1-Year — $2,000","VIP",200000,200000,200000,500,365,182500,"High","Proposed outcome: $38,500 after 1 year (approximately 320,000 ETB principal). Approval required."],
+    ["AYAT-VIP-2500","VIP 1-Year — $2,500","VIP",250000,250000,250000,500,365,182500,"High","Proposed outcome: $48,125 after 1 year (approximately 400,000 ETB principal). Approval required."],
+    ["AYAT-VIP-3000","VIP 1-Year — $3,000–$5,000","VIP",300000,300000,500000,500,365,182500,"Low","Flexible entry from $3,000 to $5,000 (approximately 480,000 to 800,000 ETB principal). Final allocation and outcome require an approved agreement."]];
+  db.exec("BEGIN IMMEDIATE");try{const q=db.prepare("INSERT INTO investment_plans (public_id,name,category,nav_cents,minimum_cents,maximum_cents,daily_return_bps,duration_days,projected_return_bps,management_fee_bps,risk_level,status,description,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,0,?,'active',?,?,?) ON CONFLICT(public_id) DO UPDATE SET name=excluded.name,category=excluded.category,minimum_cents=excluded.minimum_cents,maximum_cents=excluded.maximum_cents,duration_days=excluded.duration_days,projected_return_bps=excluded.projected_return_bps,risk_level=excluded.risk_level,status='active',description=excluded.description,updated_at=excluded.updated_at");for(const p of plans)q.run(...p,timestamp,timestamp);db.prepare("UPDATE investment_plans SET status='inactive',updated_at=? WHERE public_id NOT LIKE 'AYAT-%'").run(timestamp);db.prepare("INSERT INTO platform_settings (key,value,updated_at) VALUES ('ayat_investment_catalogue_v1','1',?)").run(timestamp);db.exec("COMMIT")}catch(e){db.exec("ROLLBACK");throw e}
+}
 if (vehicleCount === 0) {
   const timestamp = new Date().toISOString();
   const insert = db.prepare("INSERT INTO vehicles (public_id,title,year,make,model,price_cents,mileage,color,image_path,status,featured,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,'available',1,?,?)");

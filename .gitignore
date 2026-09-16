@@ -8,3 +8,7 @@ playwright-report/
 .env
 .env.*
 !.env.example
+details.txt
+implementations.txt
+though process
+images/download.htm

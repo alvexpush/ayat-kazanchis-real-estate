@@ -64,8 +64,8 @@ async function main() {
     body: JSON.stringify({
       fromAddress,
       toAddress: recipient,
-      subject: "Vanguard Prime production email check",
-      content: "<p>Zoho Mail is configured correctly for Vanguard Prime.</p>",
+      subject: "Ayat Kazanchis production email check",
+      content: "<p>Zoho Mail is configured correctly for Ayat Kazanchis Real Estate.</p>",
       mailFormat: "html",
       askReceipt: "no"
     })
