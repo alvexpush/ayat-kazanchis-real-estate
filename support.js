@@ -12,7 +12,7 @@
   const launch=document.createElement("button");
   launch.className="support-bot-launch";
   launch.type="button";
-  launch.textContent="Support Chat";
+  launch.innerHTML='<span aria-hidden="true">●</span> Contact Admin';
   document.body.appendChild(launch);
   const messagesHost=layer.querySelector("[data-support-messages]"),form=layer.querySelector("form"),input=form.querySelector("input");
 
@@ -31,6 +31,7 @@
   }
   const open=()=>{layer.hidden=false;sync();input.focus()},close=()=>{layer.hidden=true};
   launch.onclick=open;
+  document.querySelectorAll("[data-support-open]").forEach(element=>element.addEventListener("click",event=>{event.preventDefault();open()}));
   layer.querySelector("[data-support-close]").onclick=close;
   layer.onclick=event=>{if(event.target===layer)close()};
   form.onsubmit=async event=>{event.preventDefault();const message=input.value.trim(),button=form.querySelector("button");if(!message)return;button.disabled=true;try{await send(message);input.value=""}catch(error){const notice=document.createElement("div");notice.className="support-message";notice.textContent=error.message;messagesHost.appendChild(notice)}finally{button.disabled=false}};

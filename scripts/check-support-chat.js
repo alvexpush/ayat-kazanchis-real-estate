@@ -64,8 +64,8 @@ async function request(url, options = {}) {
     await visitorContext.addInitScript((session) => localStorage.setItem("vanguardprimeSupportConversation", JSON.stringify(session)), { id: conversationId, token: visitorToken, status: "open" });
     const visitorPage = await visitorContext.newPage();
     await visitorPage.goto(`${base}/index.html`, { waitUntil: "domcontentloaded" });
-    await visitorPage.locator("[data-chat-launcher]").click();
-    await visitorPage.locator("[data-chat-messages] p").filter({ hasText: "Automated admin reply" }).waitFor({ timeout: 10000 });
+    await visitorPage.locator(".support-bot-launch").click();
+    await visitorPage.locator(".support-messages .support-message").filter({ hasText: "Automated admin reply" }).waitFor({ timeout: 10000 });
     await visitorPage.screenshot({ path: "data/vanguardprime-home-support-reply.png" });
     console.log({ conversationCreated: true, adminInboxReceived: true, adminReplyReceived: true, adminUiRendered: true, visitorUiRendered: true, chronological: true, messageCount: visitorView.payload.messages.length });
   } finally {

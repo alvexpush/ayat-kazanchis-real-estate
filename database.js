@@ -390,29 +390,6 @@ db.prepare("UPDATE stock_orders SET annual_roi_bps=7000 WHERE annual_roi_bps<>70
 db.prepare("UPDATE investment_plans SET name='Technology Growth Fund',category='Technology',description='Diversified global technology growth portfolio.',updated_at=? WHERE lower(name) LIKE '%tesla%' OR lower(category) LIKE '%tesla%'").run(new Date().toISOString());
 db.prepare("DELETE FROM vehicles WHERE lower(make)='tesla' OR lower(title) LIKE '%tesla%' OR lower(model) LIKE '%tesla%'").run();
 
-const count = db.prepare("SELECT COUNT(*) AS count FROM investment_plans").get().count;
-if (count === 0) {
-  const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO investment_plans
-      (public_id,name,category,nav_cents,minimum_cents,projected_return_bps,management_fee_bps,risk_level,status,description,created_at,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-  `);
-  const plans = [
-    ["PLAN-TECH-GROWTH","Technology Growth Fund","Technology",3550,10000,923,85,"High","active","Diversified global technology growth portfolio."],
-    ["PLAN-SUSTAINABLE","Sustainable Energy ETF","ESG",1875,5000,480,65,"Medium","active","Diversified sustainable-energy exposure."],
-    ["PLAN-GLOBAL-GROWTH","Global Growth Fund","Growth",1980,40000,640,75,"Medium","active","Global growth companies and themes."]
-  ];
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    for (const plan of plans) insert.run(...plan, now, now);
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
-}
-
 const stagedPlans = [
   ["PLAN-BEGINNER-1A","Basic Starter","Basic",10000,10000,699900,500,1,500,0,"Low","active","A one-day entry package for new investors."],
   ["PLAN-BEGINNER-1B","Basic Plus","Basic",10000,10000,699900,500,1,500,0,"Low","active","A flexible entry package for new investors."],
@@ -463,6 +440,26 @@ if(!db.prepare("SELECT 1 FROM platform_settings WHERE key='investment_package_ca
 
 db.prepare("UPDATE investment_plans SET risk_level='Low',updated_at=? WHERE public_id LIKE 'AYAT-%' AND risk_level<>'Low'").run(new Date().toISOString());
 db.prepare("UPDATE investment_plans SET name='VIP 1-Year — $3,000–$5,000',minimum_cents=300000,maximum_cents=500000,risk_level='Low',description='Flexible entry from $3,000 to $5,000 (approximately 480,000 to 800,000 ETB principal). Final allocation and outcome require an approved agreement.',updated_at=? WHERE public_id='AYAT-VIP-3000'").run(new Date().toISOString());
+
+// Keep the customer catalogue canonical while preserving legacy rows for existing order history.
+const investmentCatalogue=[
+  ["AYAT-7-DAY","7-Day Plan","Regular",10000,5000,500000,300,7,2100,"High","Invest for 7 days with a $50 minimum and $5,000 maximum."],
+  ["AYAT-30-DAY","30-Day Plan","Regular",10000,30000,1000000,400,30,12000,"High","Invest for 30 days with a $300 minimum and $10,000 maximum."],
+  ["AYAT-VIP","VIP Plan","VIP",10000,100000,null,500,365,182500,"Low","A 1-year VIP opportunity with a $1,000 minimum and no maximum limit."]
+];
+db.exec("BEGIN IMMEDIATE");
+try{
+  const timestamp=new Date().toISOString(),ids=investmentCatalogue.map(plan=>plan[0]);
+  db.prepare(`UPDATE investment_plans SET status='inactive',updated_at=? WHERE public_id NOT IN (${ids.map(()=>"?").join(",")})`).run(timestamp,...ids);
+  const upsert=db.prepare(`INSERT INTO investment_plans (public_id,name,category,nav_cents,minimum_cents,maximum_cents,daily_return_bps,duration_days,projected_return_bps,management_fee_bps,risk_level,status,description,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,0,?,'active',?,?,?)
+    ON CONFLICT(public_id) DO UPDATE SET name=excluded.name,category=excluded.category,nav_cents=excluded.nav_cents,minimum_cents=excluded.minimum_cents,maximum_cents=excluded.maximum_cents,daily_return_bps=excluded.daily_return_bps,duration_days=excluded.duration_days,projected_return_bps=excluded.projected_return_bps,risk_level=excluded.risk_level,status='active',description=excluded.description,updated_at=excluded.updated_at`);
+  for(const plan of investmentCatalogue){
+    const [publicId,name,category,navCents,minimumCents,maximumCents,dailyReturnBps,durationDays,projectedReturnBps,riskLevel,description]=plan;
+    upsert.run(publicId,name,category,navCents,minimumCents,maximumCents,dailyReturnBps,durationDays,projectedReturnBps,riskLevel,description,timestamp,timestamp);
+  }
+  db.exec("COMMIT");
+}catch(error){db.exec("ROLLBACK");throw error}
 const vehicleCount = db.prepare("SELECT COUNT(*) AS count FROM vehicles").get().count;
 if(!db.prepare("SELECT 1 FROM platform_settings WHERE key='ayat_investment_catalogue_v1'").get()){
   const timestamp=new Date().toISOString();

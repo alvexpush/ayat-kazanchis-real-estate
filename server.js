@@ -731,8 +731,8 @@ async function api(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/investment-orders") {
     const user=requireUser(req,res);if(!user)return;const input=await body(req),amount=cents(input.amount),plan=db.prepare("SELECT * FROM investment_plans WHERE public_id=? AND status='active'").get(String(input.planId||""));
     if(!plan)return json(res,404,{error:"Investment plan was not found."});
-    if(!Number.isSafeInteger(amount)||amount<plan.minimum_cents)return json(res,422,{error:`Minimum investment is ${(plan.minimum_cents/100).toFixed(2)}.`});
-    if(plan.maximum_cents&&amount>plan.maximum_cents)return json(res,422,{error:`Maximum investment is ${(plan.maximum_cents/100).toFixed(2)}.`});
+    if(!Number.isSafeInteger(amount)||amount<plan.minimum_cents)return json(res,422,{error:plan.maximum_cents?`Choose between ${moneyEmail(plan.minimum_cents)} and ${moneyEmail(plan.maximum_cents)}.`:`Minimum investment is ${moneyEmail(plan.minimum_cents)}. No maximum limit.`});
+    if(plan.maximum_cents&&amount>plan.maximum_cents)return json(res,422,{error:`Choose between ${moneyEmail(plan.minimum_cents)} and ${moneyEmail(plan.maximum_cents)}.`});
     const durationDays=Number(plan.duration_days)||30;
     const fee=Math.round(amount*(Number(plan.management_fee_bps)||0)/10000),total=amount+fee,wallet=db.prepare("SELECT * FROM wallets WHERE user_id=?").get(user.id);if(wallet.available_cents<total)return json(res,409,{error:"Your account balance is insufficient for this investment.",code:"INSUFFICIENT_BALANCE",requiredCents:total,availableCents:wallet.available_cents,shortfallCents:total-wallet.available_cents});
     const orderId=publicId("ORD"),transactionId=publicId("TXN"),timestamp=now(),units=Math.floor((amount/plan.nav_cents)*1_000_000);
